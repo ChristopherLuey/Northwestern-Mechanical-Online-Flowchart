@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:developer' as developer;
+import 'course_info.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 final Size globalCanvasSize = Size(8000, 5000); // Global canvas size
 
@@ -18,67 +20,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final Size courseBoxSize = Size(200, 100);
 
-  // Original positions for each course box
-
-  final Map<String, Offset> _originalPositions = {
-    'GEN_ENG 205-1': Offset(368.2, 181.8),
-    'MATH 220-1': Offset(67.0, 0.0),
-    'PHYSICS 135-2/136-2': Offset(935.4, 0.0),
-    'MATH 220-2': Offset(68.6, 281.2),
-    'GEN_ENG 205-2': Offset(649.1, 177.1),
-    'PHYSICS 135-3/136-3': Offset(1489.3, 0.0),
-    'GEN_ENG 205-3': Offset(651.6, 416.9),
-    'MECH_ENG 222': Offset(962.4, 404.7),
-    'CIV_ENV 216': Offset(1180.1, 304.9),
-    'MECH_ENG 224': Offset(1167.7, 122.2),
-    'GEN_ENG 205-4': Offset(371.7, 415.7),
-    'MECH_ENG 314': Offset(761.0, 609.6),
-    'MECH_ENG 241': Offset(386.0, 690.8),
-    'MECH_ENG 377': Offset(757.7, 805.8),
-    'MECH_ENG 390': Offset(1138.3, 587.7),
-    'MATH 228-1': Offset(69.6, 491.8),
-    'MAT_SCI 201': Offset(1831.9, 278.3),
-    'MECH_ENG 240': Offset(1648.3, 118.1),
-    'MECH_ENG 315': Offset(1671.3, 480.5),
-    'MATH 228-2': Offset(71.5, 691.1),
-    'CHEM 131/141': Offset(2027.0, 456.7),
-    'MECH_ENG 340-1': Offset(1400.8, 470.8),
-    'MECH_ENG 233': Offset(1041.8, 832.9),
-    'COMM_ST 102': Offset(1296.5, 828.1),
-    'DSGN 106-1': Offset(1842.4, 634.0),
-    'DSGN 106-2': Offset(1578.2, 811.1),
-    'MECH_ENG 398-1': Offset(210.4, 926.8),
-    'MECH_ENG 398-2': Offset(559.6, 922.7),
-  };
-
   Map<String, Offset> positions = {};
-
-  // Define prerequisites
-  final Map<String, List<String>> prerequisites = {
-    'MATH 220-2': ['MATH 220-1'],
-    'MATH 228-1': ['MATH 220-2'],
-    'MATH 228-2': ['MATH 228-1'],
-    'DSGN 106-2': ['DSGN 106-1'],
-    'PHYSICS 135-2/136-2': ['MATH 220-1', 'GEN_ENG 205-3'],
-    'PHYSICS 135-3/136-3': ['PHYSICS 135-2/136-2'],
-    'GEN_ENG 205-2': ['GEN_ENG 205-1', 'MATH 220-1'],
-    'GEN_ENG 205-3': ['GEN_ENG 205-2'],
-    'GEN_ENG 205-4': ['GEN_ENG 205-3', 'MATH 220-2'],
-    'MAT_SCI 201': ['CHEM 131/141'],
-    'CIV_ENV 216': ['GEN_ENG 205-2'],
-    'MECH_ENG 240': ['CIV_ENV 216', 'MAT_SCI 201'],
-    'MECH_ENG 233': [],
-    'MECH_ENG 222': ['GEN_ENG 205-3'],
-    'MECH_ENG 224': ['GEN_ENG 205-2'],
-    'MECH_ENG 315': ['MECH_ENG 240'],
-    'MECH_ENG 340-1': ['MECH_ENG 240'],
-    'MECH_ENG 241': ['MATH 228-2', 'GEN_ENG 205-4'],
-    'MECH_ENG 377': ['MECH_ENG 241'],
-    'MECH_ENG 390': ['CIV_ENV 216', 'MECH_ENG 377'],
-    'MECH_ENG 314': ['GEN_ENG 205-4'],
-    'MECH_ENG 398-1': [],
-    'MECH_ENG 398-2': ['MECH_ENG 398-1'],
-  };
 
   Offset panOffset = Offset.zero;
   double scale = 1.0;
@@ -92,7 +34,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
   }
 
   void _initializeFlowchart() {
-    positions = Map.from(_originalPositions);
+    positions = courses.map((key, courseInfo) => MapEntry(key, courseInfo.originalPosition));
     positions.forEach((key, value) {
       developer.log('Initial position of $key: $value', name: 'FlowchartViewer');
     });
@@ -157,9 +99,10 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                           children: <Widget>[
                             CustomPaint(
                               size: Size.infinite,
-                              painter: FlowchartPainter(positions, courseBoxSize, prerequisites),
+                              painter: FlowchartPainter(positions, courseBoxSize, courses),
                             ),
                             ...positions.entries.map((entry) {
+                              final courseInfo = courses[entry.key]!;
                               final isSelected = entry.key == selectedCourse;
                               developer.log('Rendering ${entry.key} at position ${entry.value}', name: 'FlowchartViewer');
                               return Positioned(
@@ -171,7 +114,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                                   },
                                   onPanUpdate: (details) {
                                     setState(() {
-                                      final newPosition = entry.value + details.delta * 2.0;
+                                      final newPosition = entry.value + details.delta * 3.0;
                                       positions[entry.key] = _clampPosition(newPosition);
                                       _resolveAllCollisions();
                                     });
@@ -192,10 +135,10 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                                           : [],
                                     ),
                                     child: CourseBox(
-                                      title: entry.key,
-                                      subtitle: _getSubtitle(entry.key),
-                                      term: _getTerm(entry.key),
-                                      year: _getYear(entry.key),
+                                      title: courseInfo.name,
+                                      subtitle: courseInfo.title,
+                                      term: courseInfo.term,
+                                      year: courseInfo.year,
                                     ),
                                   ),
                                 ),
@@ -248,17 +191,111 @@ class FlowchartViewerState extends State<FlowchartViewer> {
   }
 
   Widget _buildCoursePanel() {
+    final courseInfo = courses[selectedCourse];
     return Drawer(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppBar(
-            title: Text(selectedCourse ?? ''),
+            title: Text(courseInfo?.name ?? ''),
             automaticallyImplyLeading: false,
           ),
-          // Add more details about the course here
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Text('Details about $selectedCourse'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Title: ${courseInfo?.full_title ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 8.0),
+                Text('Year: ${courseInfo?.year ?? ''}'),
+                Row(
+                  children: List.generate(4, (index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            if (courseInfo != null) {
+                              courses[selectedCourse!] = CourseInfo(
+                                name: courseInfo.name,
+                                title: courseInfo.title,
+                                full_title: courseInfo.full_title,
+                                year: index + 1,
+                                prerequisites: courseInfo.prerequisites,
+                                term: courseInfo.term,
+                                originalPosition: courseInfo.originalPosition,
+                                description: courseInfo.description,
+                                link: courseInfo.link,
+                                term_taking: courseInfo.term_taking,
+                              );
+                            }
+                          });
+                        },
+                        child: Text('${index + 1}'),
+                      ),
+                    );
+                  }),
+                ),
+                SizedBox(height: 8.0),
+                Text('Term: ${courseInfo?.term ?? ''}'),
+                Text('Planned Term: ${courseInfo?.term_taking ?? 'Not Set'}'),
+                Row(
+                  children: ['F', 'W', 'S'].map((term) {
+                    final isAvailable = courseInfo?.term.contains(term) ?? false;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: ElevatedButton(
+                        onPressed: isAvailable
+                            ? () {
+                                setState(() {
+                                  if (courseInfo != null) {
+                                    courses[selectedCourse!] = CourseInfo(
+                                      name: courseInfo.name,
+                                      title: courseInfo.title,
+                                      full_title: courseInfo.full_title,
+                                      year: courseInfo.year,
+                                      prerequisites: courseInfo.prerequisites,
+                                      term: courseInfo.term,
+                                      originalPosition: courseInfo.originalPosition,
+                                      description: courseInfo.description,
+                                      link: courseInfo.link,
+                                      term_taking: term,
+                                    );
+                                  }
+                                });
+                              }
+                            : null,
+                        child: Text(term),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isAvailable ? null : Colors.grey, // Gray out if not available
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                SizedBox(height: 8.0),
+                Text('Prerequisites: ${courseInfo?.prerequisites.join(', ') ?? 'None'}'),
+                SizedBox(height: 8.0),
+                Text('Description: ${courseInfo?.description ?? ''}'),
+                SizedBox(height: 8.0),
+                GestureDetector(
+                  onTap: () async {
+                    if (courseInfo?.link != null) {
+                      final url = Uri.parse(courseInfo!.link);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url);
+                      } else {
+                        developer.log('Could not launch ${courseInfo.link}', name: 'FlowchartViewer');
+                      }
+                    }
+                  },
+                  child: Text(
+                    'More Info',
+                    style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -309,195 +346,6 @@ class FlowchartViewerState extends State<FlowchartViewer> {
     );
   }
 
-  String _getSubtitle(String course) {
-    switch (course) {
-      case 'GEN_ENG 205-1':
-        return 'Eng Analysis I';
-      case 'MATH 220-1':
-        return 'Single Var Diff Calc';
-      case 'MATH 220-2':
-        return 'Single Var Int Calc';
-      case 'MATH 228-1':
-        return 'Multivar Diff Calc';
-      case 'MATH 228-2':
-        return 'Multivar Int Calc';
-      case 'PHYSICS 135-2/136-2':
-        return 'E&M';
-      case 'PHYSICS 135-3/136-3':
-        return 'Waves and Motion';
-      case 'GEN_ENG 205-2':
-        return 'Eng Analysis II';
-      case 'COMM_ST 102':
-        return 'Or PERF_ST 103 or PERF_ST 203';
-      case 'DSGN 106-1':
-        return 'Dsgn Thinking and Communication I';
-      case 'DSGN 106-2':
-        return 'Dsgn Thinking and Communication II';
-      case 'CHEM 131/141':
-        return 'Or CHEM 151/161 or CHEM 171/181';
-      case 'MAT_SCI 201':
-        return 'Materials Science';
-      case 'GEN_ENG 205-3':
-        return 'Eng Analysis III';
-      case 'GEN_ENG 205-4':
-        return 'Eng Analysis IV';
-      case 'CIV_ENV 216':
-        return 'Mech. of Materials';
-      case 'MECH_ENG 233':
-        return 'Electronics Design';
-      case 'MECH_ENG 222':
-        return 'Thermo I';
-      case 'MECH_ENG 224':
-        return 'Sci Embed Prog Python';
-      case 'MECH_ENG 240':
-        return 'Mech Design & Manufacturing';
-      case 'MECH_ENG 315':
-        return 'Thry of Machines: Dsgn of Elements';
-      case 'MECH_ENG 340-1':
-        return 'Manuf Processes';
-      case 'MECH_ENG 390':
-        return 'Intro to Dynamic Systems';
-      case 'MECH_ENG 241':
-        return 'Fluid Mech';
-      case 'MECH_ENG 377':
-        return 'Heat Transfer';
-      case 'MECH_ENG 314':
-        return 'Dynamics';
-      case 'MECH_ENG 398-1':
-        return 'Engineering Dsgn';
-      case 'MECH_ENG 398-2':
-        return 'Engineering Dsgn';
-      default:
-        return '';
-    }
-  }
-
-  String _getTerm(String course) {
-    switch (course) {
-      case 'GEN_ENG 205-1':
-        return '[FW ]';
-      case 'MATH 220-1':
-        return '[FW ]';
-      case 'MATH 220-2':
-        return '[FWS]';
-      case 'MATH 228-1':
-        return '[FWS]';
-      case 'MATH 228-2':
-        return '[FWS]';
-      case 'PHYSICS 135-2/136-2':
-        return '[FW ]';
-      case 'PHYSICS 135-3/136-3':
-        return '[ WS]';
-      case 'GEN_ENG 205-2':
-        return '[ WS]';
-      case 'COMM_ST 102':
-        return '[FWS]';
-      case 'DSGN 106-1':
-        return '[FW ]';
-      case 'DSGN 106-2':
-        return '[  S]';
-      case 'CHEM 131/141':
-        return '[FWS]';
-      case 'GEN_ENG 205-3':
-        return '[F S]';
-      case 'GEN_ENG 205-4':
-        return '[FW ]';
-      case 'MAT_SCI 201':
-        return '[FWS]';
-      case 'CIV_ENV 216':
-        return '[FWS]';
-      case 'MECH_ENG 233':
-        return '[F  ]';
-      case 'MECH_ENG 222':
-        return '[ W ]';
-      case 'MECH_ENG 224':
-        return '[ WS]';
-      case 'MECH_ENG 240':
-        return '[  S]';
-      case 'MECH_ENG 315':
-        return '[F S]';
-      case 'MECH_ENG 340-1':
-        return '[F  ]';
-      case 'MECH_ENG 390':
-        return '[F  ]';
-      case 'MECH_ENG 241':
-        return '[F S]';
-      case 'MECH_ENG 377':
-        return '[ WS]';
-      case 'MECH_ENG 314':
-        return '[F S]';
-      case 'MECH_ENG 398-1':
-        return '[FW ]';
-      case 'MECH_ENG 398-2':
-        return '[ WS]';
-      default:
-        return '';
-    }
-  }
-
-  int _getYear(String course) {
-    switch (course) {
-      case 'GEN_ENG 205-1':
-        return 1;
-      case 'MATH 220-1':
-        return 1;
-      case 'MATH 220-2':
-        return 1;
-      case 'MATH 228-1':
-        return 1;
-      case 'MATH 228-2':
-        return 1;
-      case 'PHYSICS 135-2/136-2':
-        return 2;
-      case 'PHYSICS 135-3/136-3':
-        return 2;
-      case 'GEN_ENG 205-2':
-        return 1;
-      case 'COMM_ST 102':
-        return 3;
-      case 'DSGN 106-1':
-        return 1;
-      case 'DSGN 106-2':
-        return 1;
-      case 'CHEM 131/141':
-        return 1;
-      case 'GEN_ENG 205-3':
-        return 1;
-      case 'GEN_ENG 205-4':
-        return 2;
-      case 'MAT_SCI 201':
-        return 2;
-      case 'CIV_ENV 216':
-        return 2;
-      case 'MECH_ENG 233':
-        return 2;
-      case 'MECH_ENG 222':
-        return 2;
-      case 'MECH_ENG 224':
-        return 2;
-      case 'MECH_ENG 240':
-        return 2;
-      case 'MECH_ENG 315':
-        return 3;
-      case 'MECH_ENG 340-1':
-        return 3;
-      case 'MECH_ENG 390':
-        return 3;
-      case 'MECH_ENG 241':
-        return 2;
-      case 'MECH_ENG 377':
-        return 3;
-      case 'MECH_ENG 314':
-        return 3;
-      case 'MECH_ENG 398-1':
-        return 4;
-      case 'MECH_ENG 398-2':
-        return 4;
-      default:
-        return 0;
-    }
-  }
-
   void _onBubbleTap(String course) {
     setState(() {
       selectedCourse = course; // Set the selected course
@@ -525,9 +373,9 @@ class FlowchartViewerState extends State<FlowchartViewer> {
 class FlowchartPainter extends CustomPainter {
   final Map<String, Offset> positions;
   final Size courseBoxSize;
-  final Map<String, List<String>> prerequisites;
+  final Map<String, CourseInfo> courses;
 
-  FlowchartPainter(this.positions, this.courseBoxSize, this.prerequisites);
+  FlowchartPainter(this.positions, this.courseBoxSize, this.courses);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -535,9 +383,9 @@ class FlowchartPainter extends CustomPainter {
       ..color = Colors.purple
       ..strokeWidth = 3.0;
 
-    for (var entry in prerequisites.entries) {
+    for (var entry in courses.entries) {
       final course = entry.key;
-      final prereqs = entry.value;
+      final prereqs = entry.value.prerequisites;
 
       for (var prereq in prereqs) {
         final startCenter = positions[prereq]! + Offset(courseBoxSize.width / 2, courseBoxSize.height / 2);

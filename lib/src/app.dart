@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Curriculum Planner',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(primarySwatch: Colors.deepPurple),
       home: const HomePage(),
     );
   }
@@ -36,19 +36,48 @@ class HomePage extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Mechanical Engineering Curriculum'),
+          title: const Text(
+            'Mechanical Engineering Curriculum',
+            style: TextStyle(
+              fontSize: 30.0,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                // Find the FlowchartViewer's state and reset it
+                final flowchartViewerState = context.findAncestorStateOfType<FlowchartViewerState>();
+                flowchartViewerState?.resetFlowchart();
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                // Navigate to settings page
+              },
+            ),
+          ],
           bottom: const TabBar(
+            indicatorWeight: 2.0,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelPadding: EdgeInsets.symmetric(vertical: 0.0),
             tabs: [
-              Tab(icon: Icon(Icons.view_module), text: 'Flowchart Viewer'),
-              Tab(icon: Icon(Icons.edit), text: 'Curriculum Planner'),
+              Tab(text: 'Flowchart Viewer'),
+              Tab(text: 'Curriculum Planner'),
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [
-            FlowchartViewer(),
-            CurriculumPlanner(),
-          ],
+        body: const Padding(
+          padding: EdgeInsets.all(8.0),
+          child: TabBarView(
+            children: [
+              FlowchartViewer(),
+              CurriculumPlanner(),
+            ],
+          ),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'dart:developer' as developer;
 import 'course_info.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'curriculum_planner.dart'; // Import the CurriculumPlanner page
 
 final Size globalCanvasSize = Size(8000, 5000); // Global canvas size
 
@@ -91,6 +92,9 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                     child: Container(
                       width: globalCanvasSize.width,
                       height: globalCanvasSize.height,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.transparent),
+                      ),
                       child: Transform(
                         transform: Matrix4.identity()
                           ..translate(panOffset.dx, panOffset.dy)
@@ -163,6 +167,19 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                 });
               },
               child: Icon(Icons.refresh),
+            ),
+          ),
+          Positioned(
+            bottom: 140,
+            left: 20,
+            child: FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CurriculumPlanner()),
+                );
+              },
+              child: Icon(Icons.schedule),
             ),
           ),
           Positioned(

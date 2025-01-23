@@ -1,10 +1,1 @@
-{
-  "hosting": {
-    "public": "build/web",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ]
-  }
-}
+{"hosting":{"public":"build/web","ignore":["firebase.json","**/.*","**/node_modules/**"]},"flutter":{"platforms":{"android":{"default":{"projectId":"mechanical-flowchart","appId":"1:779667663889:android:23436acb7ad805e7b9d5b0","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"mechanical-flowchart","appId":"1:779667663889:ios:b262c651e886640ab9d5b0","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"mechanical-flowchart","appId":"1:779667663889:ios:b262c651e886640ab9d5b0","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"mechanical-flowchart","configurations":{"android":"1:779667663889:android:23436acb7ad805e7b9d5b0","ios":"1:779667663889:ios:b262c651e886640ab9d5b0","macos":"1:779667663889:ios:b262c651e886640ab9d5b0","web":"1:779667663889:web:d5af98ccb9768711b9d5b0","windows":"1:779667663889:web:7281077e81df5d91b9d5b0"}}}}}}

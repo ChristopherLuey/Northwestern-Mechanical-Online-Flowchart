@@ -6,14 +6,33 @@ class CurriculumPlanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => CurriculumProvider(),
-      child: Column(
-        children: [
-          Expanded(child: CourseGrid()),
-          const Divider(),
-          Expanded(child: QuarterPlanner()),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Curriculum Planner'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context); // Navigate back to the previous screen
+            },
+          ),
         ],
+      ),
+      body: ChangeNotifierProvider(
+        create: (_) => CurriculumProvider(),
+        child: Column(
+          children: [
+            Expanded(child: CourseGrid()),
+            const Divider(),
+            Expanded(child: QuarterPlanner()),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pop(context); // Navigate back to the previous screen
+        },
+        child: const Icon(Icons.arrow_back),
       ),
     );
   }

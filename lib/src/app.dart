@@ -32,54 +32,66 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Mechanical Engineering Curriculum',
+    return Scaffold(
+      backgroundColor: Colors.deepPurple,
+      appBar: AppBar(
+        elevation: 0,
+        title: const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Mechanical Engineering Flowchart',
             style: TextStyle(
-              fontSize: 30.0,
+              fontSize: 25.0,
               fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-          ),
-          backgroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                // Find the FlowchartViewer's state and reset it
-                final flowchartViewerState = context.findAncestorStateOfType<FlowchartViewerState>();
-                flowchartViewerState?.resetFlowchart();
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () {
-                // Navigate to settings page
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            indicatorWeight: 2.0,
-            indicatorSize: TabBarIndicatorSize.label,
-            labelPadding: EdgeInsets.symmetric(vertical: 0.0),
-            tabs: [
-              Tab(text: 'Flowchart Viewer'),
-              Tab(text: 'Curriculum Planner'),
-            ],
           ),
         ),
-        body: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: TabBarView(
-            children: [
-              FlowchartViewer(),
-              CurriculumPlanner(),
-            ],
+        backgroundColor: Colors.deepPurple,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.settings,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              // Navigate to settings page
+            },
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: GestureDetector(
+              onTap: () {
+                // Handle sign-in action
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [const Color.fromARGB(255, 130, 79, 218), const Color.fromARGB(255, 138, 64, 180)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                      offset: Offset(0, 3), // changes position of shadow
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: const Text(
+                  'Sign In',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+      body: const FlowchartViewer(),
     );
   }
 }

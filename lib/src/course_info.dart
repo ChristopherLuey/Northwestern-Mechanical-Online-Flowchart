@@ -2,7 +2,7 @@ import 'dart:ui';
 
 class CourseInfo {
   final String name;
-  final int year;
+  int year;
   final List<String> prerequisites;
   final String term;
   final Offset originalPosition;
@@ -16,7 +16,7 @@ class CourseInfo {
     required this.name,
     required this.title,
     required this.full_title,
-    required this.year,
+    this.year = 1,
     required this.prerequisites,
     required this.term,
     required this.originalPosition,

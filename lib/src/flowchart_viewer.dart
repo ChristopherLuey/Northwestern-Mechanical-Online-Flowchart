@@ -6,7 +6,8 @@ import 'package:flutter/gestures.dart';
 import 'dart:developer' as developer;
 import 'course_info.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'curriculum_planner.dart'; // Import the CurriculumPlanner page
+import 'curriculum_planner.dart';
+import 'package:provider/provider.dart';
 
 final Size globalCanvasSize = Size(8000, 5000); // Global canvas size
 
@@ -45,6 +46,29 @@ class FlowchartViewerState extends State<FlowchartViewer> {
     setState(() {
       _initializeFlowchart();
     });
+  }
+
+  void _onTermSelected(String course, String term, int year) {
+    final courseInfo = courses[course];
+    if (courseInfo != null) {
+      setState(() {
+        final provider = Provider.of<CurriculumProvider>(context, listen: false);
+
+        // Remove the course from the previous term if it was set
+        if (courseInfo.term_taking != "Not Set" && courseInfo.term_taking != '🚫') {
+          provider.removeCourseFromTerm(courseInfo, courseInfo.year, courseInfo.term_taking);
+        }
+
+        // Update the course with the new term and year
+        courseInfo.term_taking = term == '🚫' ? "Not Set" : term;
+        courseInfo.year = year;
+
+        // Assign the course to the new term if it's not '🚫'
+        if (term != '🚫') {
+          provider.assignCourseToTerm(courseInfo, year, term);
+        }
+      });
+    }
   }
 
   @override
@@ -161,6 +185,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
             bottom: 20,
             right: 20,
             child: FloatingActionButton(
+              heroTag: 'resetButton',
               onPressed: () {
                 setState(() {
                   resetFlowchart(); // Reset positions when button is pressed
@@ -170,9 +195,10 @@ class FlowchartViewerState extends State<FlowchartViewer> {
             ),
           ),
           Positioned(
-            bottom: 140,
+            bottom: 80,
             left: 20,
             child: FloatingActionButton(
+              heroTag: 'plannerButton',
               onPressed: () {
                 Navigator.push(
                   context,
@@ -186,6 +212,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
             bottom: 20,
             left: 20,
             child: FloatingActionButton(
+              heroTag: 'addButton',
               onPressed: () {
                 // Define the action for the plus button here
               },
@@ -196,6 +223,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
             bottom: 80,
             right: 20,
             child: FloatingActionButton(
+              heroTag: 'saveButton',
               onPressed: () {
                 logCurrentPositions(); // Log positions when button is pressed
               },
@@ -210,11 +238,12 @@ class FlowchartViewerState extends State<FlowchartViewer> {
   Widget _buildCoursePanel() {
     final courseInfo = courses[selectedCourse];
     return Drawer(
+      width: 325.0,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppBar(
-            title: Text(courseInfo?.name ?? ''),
+            title: Text(courseInfo?.name ?? '', style: TextStyle(fontSize: 18.0)),
             automaticallyImplyLeading: false,
           ),
           Padding(
@@ -222,31 +251,18 @@ class FlowchartViewerState extends State<FlowchartViewer> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Title: ${courseInfo?.full_title ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Title: ${courseInfo?.full_title ?? ''}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0)),
                 SizedBox(height: 8.0),
-                Text('Year: ${courseInfo?.year ?? ''}'),
+                Text('Terms Offered: ${courseInfo?.term ?? ''}', style: TextStyle(fontSize: 16.0)),
+                SizedBox(height: 8.0),
+                Text('Year: ${courseInfo?.year ?? ''}', style: TextStyle(fontSize: 16.0)),
                 Row(
                   children: List.generate(4, (index) {
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4.0),
                       child: ElevatedButton(
                         onPressed: () {
-                          setState(() {
-                            if (courseInfo != null) {
-                              courses[selectedCourse!] = CourseInfo(
-                                name: courseInfo.name,
-                                title: courseInfo.title,
-                                full_title: courseInfo.full_title,
-                                year: index + 1,
-                                prerequisites: courseInfo.prerequisites,
-                                term: courseInfo.term,
-                                originalPosition: courseInfo.originalPosition,
-                                description: courseInfo.description,
-                                link: courseInfo.link,
-                                term_taking: courseInfo.term_taking,
-                              );
-                            }
-                          });
+                          _onTermSelected(selectedCourse!, courseInfo!.term_taking, index + 1);
                         },
                         child: Text('${index + 1}'),
                       ),
@@ -254,33 +270,15 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                   }),
                 ),
                 SizedBox(height: 8.0),
-                Text('Term: ${courseInfo?.term ?? ''}'),
-                Text('Planned Term: ${courseInfo?.term_taking ?? 'Not Set'}'),
+                Text('Planned Term: ${courseInfo?.term_taking ?? 'Not Set'}', style: TextStyle(fontSize: 16.0)),
                 Row(
-                  children: ['F', 'W', 'S'].map((term) {
-                    final isAvailable = courseInfo?.term.contains(term) ?? false;
+                  children: ['F', 'W', 'S', '🚫'].map((term) {
+                    final isAvailable = term == '🚫' || (courseInfo?.term.contains(term) ?? false);
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4.0),
                       child: ElevatedButton(
                         onPressed: isAvailable
-                            ? () {
-                                setState(() {
-                                  if (courseInfo != null) {
-                                    courses[selectedCourse!] = CourseInfo(
-                                      name: courseInfo.name,
-                                      title: courseInfo.title,
-                                      full_title: courseInfo.full_title,
-                                      year: courseInfo.year,
-                                      prerequisites: courseInfo.prerequisites,
-                                      term: courseInfo.term,
-                                      originalPosition: courseInfo.originalPosition,
-                                      description: courseInfo.description,
-                                      link: courseInfo.link,
-                                      term_taking: term,
-                                    );
-                                  }
-                                });
-                              }
+                            ? () => _onTermSelected(selectedCourse!, term, courseInfo!.year)
                             : null,
                         child: Text(term),
                         style: ElevatedButton.styleFrom(
@@ -291,9 +289,9 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                   }).toList(),
                 ),
                 SizedBox(height: 8.0),
-                Text('Prerequisites: ${courseInfo?.prerequisites.join(', ') ?? 'None'}'),
+                Text('Prerequisites: ${courseInfo?.prerequisites.join(', ') ?? 'None'}', style: TextStyle(fontSize: 16.0)),
                 SizedBox(height: 8.0),
-                Text('Description: ${courseInfo?.description ?? ''}'),
+                Text('Description: ${courseInfo?.description ?? ''}', style: TextStyle(fontSize: 16.0)),
                 SizedBox(height: 8.0),
                 GestureDetector(
                   onTap: () async {
@@ -308,7 +306,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                   },
                   child: Text(
                     'More Info',
-                    style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                    style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline, fontSize: 16.0),
                   ),
                 ),
               ],

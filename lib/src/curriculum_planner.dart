@@ -233,7 +233,7 @@ class _CurriculumPlannerState extends State<CurriculumPlanner> {
         title: const Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Mechanical Engineering Curriculum Planner',
+            'Northwestern University Mechanical Engineering Curriculum Planner',
             style: TextStyle(
               fontSize: 25.0,
               fontWeight: FontWeight.bold,

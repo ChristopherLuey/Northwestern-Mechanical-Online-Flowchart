@@ -126,7 +126,7 @@ class HomePage extends StatelessWidget {
         title: const Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Mechanical Engineering Flowchart',
+            'Northwestern University Mechanical Engineering Flowchart',
             style: TextStyle(
               fontSize: 25.0,
               fontWeight: FontWeight.bold,

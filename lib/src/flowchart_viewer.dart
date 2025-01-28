@@ -97,29 +97,6 @@ class FlowchartViewerState extends State<FlowchartViewer> {
   void _addCourse(String courseName) {
     setState(() {
       addedCourses.add(courseName);
-      if (!positions.containsKey(courseName)) {
-        // Start at the center
-        Offset newPosition = Offset(
-          globalCanvasSize.width / 2 - courseBoxSize.width / 2,
-          globalCanvasSize.height / 2 - courseBoxSize.height / 2,
-        );
-
-        // Check for collisions and adjust position
-        bool collision;
-        do {
-          collision = false;
-          for (var position in positions.values) {
-            if ((newPosition - position).distance < courseBoxSize.width) {
-              // If there's a collision, move the new position slightly
-              newPosition = newPosition.translate(courseBoxSize.width + 10, 0);
-              collision = true;
-              break;
-            }
-          }
-        } while (collision);
-
-        positions[courseName] = newPosition;
-      }
     });
   }
 
@@ -576,7 +553,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                 borderRadius: BorderRadius.circular(8),
                 color: Colors.blue[700],
               ),
-              indicatorWeight: 4,
+              indicatorWeight: 6,
               labelColor: Colors.white,
               unselectedLabelColor: Colors.blueGrey[200],
               labelStyle: TextStyle(
@@ -588,8 +565,8 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                 fontSize: 14,
                 fontWeight: FontWeight.normal,
               ),
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              indicatorPadding: EdgeInsets.symmetric(horizontal: 8),
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              indicatorPadding: EdgeInsets.symmetric(horizontal: -5),
               dividerColor: Colors.grey[300],
               dividerHeight: 1,
               tabs: concentrations.map((c) => Tab(
@@ -622,6 +599,13 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                       onTap: () {
                         if (!isAdded) {
                           _addCourse(course.name);
+                          if (!positions.containsKey(course.name)) {
+                            positions[course.name] = Offset(
+                              globalCanvasSize.width / 2 - courseBoxSize.width / 2,
+                              globalCanvasSize.height / 2 - courseBoxSize.height / 2
+                            );
+                            setState(() {});
+                          }
                         }
                       },
                     ),

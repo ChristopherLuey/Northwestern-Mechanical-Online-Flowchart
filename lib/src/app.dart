@@ -23,6 +23,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CurriculumProvider()),
+        ChangeNotifierProvider(create: (_) => settingsController),
         // Add other providers here if needed
       ],
       child: MaterialApp(
@@ -60,12 +61,68 @@ class HomePage extends StatelessWidget {
     }
   }
 
+  void _showSettingsPopup(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Sign Out Button
+            Consumer<SettingsController>(
+              builder: (context, settings, _) => ListTile(
+                leading: const Icon(Icons.logout),
+                title: const Text('Sign Out'),
+                enabled: FirebaseAuth.instance.currentUser != null,
+                onTap: () {
+                  FirebaseAuth.instance.signOut();
+                  settings.notifyListeners();
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
+            // Prereq Warning Toggle
+            Consumer<SettingsController>(
+              builder: (context, settings, _) => SwitchListTile(
+                title: const Text('Show Prerequisite Warnings'),
+                value: settings.showPrereqWarnings,
+                onChanged: (value) => settings.togglePrereqWarnings(value),
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: Text(
+                'Version: 1.0.0',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text(
+                'Created by Christopher Luey (ME \'25)',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.deepPurple,
       appBar: AppBar(
-        elevation: 0,
+        elevation: 20.0,
         title: const Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -79,45 +136,43 @@ class HomePage extends StatelessWidget {
         ),
         backgroundColor: Colors.deepPurple,
         actions: [
+          // Keep the settings button always visible
           IconButton(
-            icon: const Icon(
-              Icons.settings,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              // Navigate to settings page
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () => _showSettingsPopup(context),
+          ),
+          // Profile/sign-in button
+          StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              if (user != null) {
+                return GestureDetector(
+                  onTap: () => _showSettingsPopup(context),
+                  child: CircleAvatar(
+                    backgroundImage: user.photoURL != null 
+                        ? NetworkImage(user.photoURL!)
+                        : null,
+                    radius: 16,
+                  ),
+                );
+              }
+              return ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                onPressed: () => _handleSignIn(),
+                child: const Text(
+                  'Sign In',
+                  style: TextStyle(color: Colors.white),
+                ),
+              );
             },
           ),
-          if (FirebaseAuth.instance.currentUser == null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: GestureDetector(
-                onTap: _handleSignIn,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [const Color.fromARGB(255, 130, 79, 218), const Color.fromARGB(255, 138, 64, 180)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        spreadRadius: 2,
-                        blurRadius: 5,
-                        offset: Offset(0, 3), // changes position of shadow
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
       body: const FlowchartViewer(),

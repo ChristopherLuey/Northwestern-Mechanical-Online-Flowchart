@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'course_box.dart';
+import 'course_box.dart' show CourseBox;
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import 'dart:developer' as developer;
 import 'course_info.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'curriculum_planner.dart';
+import 'curriculum_planner.dart' as planner;
 import 'package:provider/provider.dart';
 
 final Size globalCanvasSize = Size(8000, 5000); // Global canvas size
@@ -28,6 +28,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
   double scale = 1.0;
 
   String? selectedCourse;
+  Set<String> addedCourses = {};
 
   @override
   void initState() {
@@ -48,33 +49,97 @@ class FlowchartViewerState extends State<FlowchartViewer> {
     });
   }
 
-  void _onTermSelected(String course, String term, int year) {
+  void _onTermSelected(String course, String term, int year) async {
     final courseInfo = courses[course];
-    if (courseInfo != null) {
-      setState(() {
-        final provider = Provider.of<CurriculumProvider>(context, listen: false);
+    if (courseInfo == null) return;
 
-        // Remove the course from the previous term if it was set
-        if (courseInfo.term_taking != "Not Set" && courseInfo.term_taking != '🚫') {
-          provider.removeCourseFromTerm(courseInfo, courseInfo.year, courseInfo.term_taking);
-        }
+    final provider = Provider.of<planner.CurriculumProvider>(context, listen: false);
+    final isRemoving = term == '🚫';
+    
+    if (!isRemoving) {
+      // Check prerequisites
+      final unmetPrereqs = courseInfo.prerequisites.where((prereqName) {
+        final prereq = courses[prereqName];
+        return prereq != null && provider.hasUnmetPrerequisites(courseInfo, year, term);
+      }).toList();
 
-        // Update the course with the new term and year
-        courseInfo.term_taking = term == '🚫' ? "Not Set" : term;
-        courseInfo.year = year;
-
-        // Assign the course to the new term if it's not '🚫'
-        if (term != '🚫') {
-          provider.assignCourseToTerm(courseInfo, year, term);
-        }
-      });
+      if (unmetPrereqs.isNotEmpty) {
+        final proceed = await _showPrerequisiteWarning(context, unmetPrereqs, courseInfo);
+        if (!proceed) return;
+      }
     }
+
+    setState(() {
+      // Remove the course from the previous term if it was set
+      if (courseInfo.term_taking != "Not Set" && courseInfo.term_taking != '🚫') {
+        provider.removeCourseFromTerm(courseInfo, courseInfo.year, courseInfo.term_taking);
+      }
+
+      // Update the course with the new term and year
+      courseInfo.term_taking = term == '🚫' ? "Not Set" : term;
+      courseInfo.year = year;
+
+      // Assign the course to the new term if it's not '🚫'
+      if (term != '🚫') {
+        provider.assignCourseToTerm(courseInfo, year, term);
+      }
+    });
+    
+    if (isRemoving) {
+      final dependentCourses = provider.getCoursesDependingOn(course);
+      if (dependentCourses.isNotEmpty) {
+        final proceed = await _showDependentCoursesWarning(context, dependentCourses, courseInfo);
+        if (!proceed) return;
+      }
+    }
+  }
+
+  void _addCourse(String courseName) {
+    setState(() {
+      addedCourses.add(courseName);
+      if (!positions.containsKey(courseName)) {
+        // Start at the center
+        Offset newPosition = Offset(
+          globalCanvasSize.width / 2 - courseBoxSize.width / 2,
+          globalCanvasSize.height / 2 - courseBoxSize.height / 2,
+        );
+
+        // Check for collisions and adjust position
+        bool collision;
+        do {
+          collision = false;
+          for (var position in positions.values) {
+            if ((newPosition - position).distance < courseBoxSize.width) {
+              // If there's a collision, move the new position slightly
+              newPosition = newPosition.translate(courseBoxSize.width + 10, 0);
+              collision = true;
+              break;
+            }
+          }
+        } while (collision);
+
+        positions[courseName] = newPosition;
+      }
+    });
+  }
+
+  void _removeCourse(String courseName) {
+    setState(() {
+      addedCourses.remove(courseName);
+      // Also remove from CurriculumProvider
+      final provider = Provider.of<planner.CurriculumProvider>(context, listen: false);
+      provider.removeCourseFromPlanner(courseName);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Listen to changes in the CurriculumProvider
+    final provider = Provider.of<planner.CurriculumProvider>(context);
+
     return Scaffold(
       key: _scaffoldKey,
+      drawer: _buildConcentrationDrawer(),
       endDrawer: selectedCourse != null ? _buildCoursePanel() : null,
       onDrawerChanged: (isOpen) {
         if (!isOpen) {
@@ -127,12 +192,20 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                           children: <Widget>[
                             CustomPaint(
                               size: Size.infinite,
-                              painter: FlowchartPainter(positions, courseBoxSize, courses),
+                              painter: FlowchartPainter(
+                                positions, 
+                                courseBoxSize,
+                                courses,
+                                addedCourses,
+                              ),
                             ),
-                            ...positions.entries.map((entry) {
+                              ...positions.entries.where((entry) {
+                                final course = courses[entry.key]!;
+                                return course.concentrations.isEmpty || 
+                                      addedCourses.contains(course.name);
+                              }).map((entry) {
                               final courseInfo = courses[entry.key]!;
                               final isSelected = entry.key == selectedCourse;
-                              developer.log('Rendering ${entry.key} at position ${entry.value}', name: 'FlowchartViewer');
                               return Positioned(
                                 top: entry.value.dy,
                                 left: entry.value.dx,
@@ -165,8 +238,9 @@ class FlowchartViewerState extends State<FlowchartViewer> {
                                     child: CourseBox(
                                       title: courseInfo.name,
                                       subtitle: courseInfo.title,
-                                      term: courseInfo.term,
                                       year: courseInfo.year,
+                                      term: courseInfo.term,
+                                      term_taking: courseInfo.term_taking,
                                     ),
                                   ),
                                 ),
@@ -202,7 +276,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const CurriculumPlanner()),
+                  MaterialPageRoute(builder: (context) => const planner.CurriculumPlanner()),
                 );
               },
               child: Icon(Icons.schedule),
@@ -214,7 +288,7 @@ class FlowchartViewerState extends State<FlowchartViewer> {
             child: FloatingActionButton(
               heroTag: 'addButton',
               onPressed: () {
-                // Define the action for the plus button here
+                _scaffoldKey.currentState?.openDrawer();
               },
               child: Icon(Icons.add),
             ),
@@ -237,14 +311,39 @@ class FlowchartViewerState extends State<FlowchartViewer> {
 
   Widget _buildCoursePanel() {
     final courseInfo = courses[selectedCourse];
+    final isAddedCourse = addedCourses.contains(selectedCourse);
+
     return Drawer(
       width: 325.0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppBar(
             title: Text(courseInfo?.name ?? '', style: TextStyle(fontSize: 18.0)),
             automaticallyImplyLeading: false,
+            elevation: 4.0,
+            actions: [
+              if (isAddedCourse) // Only show remove button for added courses
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _removeCourse(selectedCourse!);
+                      Navigator.pop(context); // Close the drawer
+                    },
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20.0),
+                      ),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                    child: Text('Remove Course', style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -383,14 +482,167 @@ class FlowchartViewerState extends State<FlowchartViewer> {
     buffer.writeln('};');
     developer.log(buffer.toString(), name: 'FlowchartViewer');
   }
+
+  Future<bool> _showPrerequisiteWarning(BuildContext context, List<String> unmetPrereqs, CourseInfo course) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Prerequisite Warning'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('The following prerequisites for ${course.name} are not met:'),
+            SizedBox(height: 10),
+            Column(
+              children: unmetPrereqs.map((p) => Text('- $p')).toList(),
+            ),
+            SizedBox(height: 20),
+            Text('Do you want to proceed anyway?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Proceed'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Future<bool> _showDependentCoursesWarning(BuildContext context, List<CourseInfo> dependentCourses, CourseInfo course) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Dependency Warning'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Removing ${course.name} affects these dependent courses:'),
+            SizedBox(height: 10),
+            Column(
+              children: dependentCourses.map((c) => Text('- ${c.name}')).toList(),
+            ),
+            SizedBox(height: 20),
+            Text('Do you want to proceed anyway?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Proceed'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Widget _buildConcentrationDrawer() {
+    final concentrations = [
+      'ME Breadth',
+      'Aerospace',
+      'Design', 
+      'Energy',
+      'Manufacturing',
+      'Mechanical Sciences',
+      'Robotics',
+      '300-Level Math Science'
+    ];
+
+    return Drawer(
+      width: 500,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+      child: DefaultTabController(
+        length: concentrations.length,
+        child: Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text('Add Concentration Courses'),
+            bottom: TabBar(
+              isScrollable: true,
+              indicator: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.blue[700],
+              ),
+              indicatorWeight: 4,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.blueGrey[200],
+              labelStyle: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+              unselectedLabelStyle: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.normal,
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              indicatorPadding: EdgeInsets.symmetric(horizontal: 8),
+              dividerColor: Colors.grey[300],
+              dividerHeight: 1,
+              tabs: concentrations.map((c) => Tab(
+                text: c,
+                iconMargin: EdgeInsets.only(bottom: 4),
+              )).toList(),
+            ),
+          ),
+          body: TabBarView(
+            children: concentrations.map((concentration) {
+              final concentrationCourses = courses.values
+                  .where((c) => c.concentrations.contains(concentration))
+                  .toList();
+
+              return ListView.builder(
+                padding: EdgeInsets.all(16),
+                itemCount: concentrationCourses.length,
+                itemBuilder: (context, index) {
+                  final course = concentrationCourses[index];
+                  final isAdded = addedCourses.contains(course.name);
+
+                  return Opacity(
+                    opacity: isAdded ? 0.5 : 1.0,
+                    child: ListTile(
+                      title: Text(course.name),
+                      subtitle: Text(course.title),
+                      trailing: isAdded 
+                          ? Icon(Icons.check_circle, color: Colors.green)
+                          : Icon(Icons.add_circle),
+                      onTap: () {
+                        if (!isAdded) {
+                          _addCourse(course.name);
+                        }
+                      },
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class FlowchartPainter extends CustomPainter {
   final Map<String, Offset> positions;
   final Size courseBoxSize;
   final Map<String, CourseInfo> courses;
+  final Set<String> addedCourses;
 
-  FlowchartPainter(this.positions, this.courseBoxSize, this.courses);
+  FlowchartPainter(this.positions, this.courseBoxSize, this.courses, this.addedCourses);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -400,6 +652,10 @@ class FlowchartPainter extends CustomPainter {
 
     for (var entry in courses.entries) {
       final course = entry.key;
+      if (courses[course]?.concentrations.isNotEmpty == true && 
+          !addedCourses.contains(course)) {
+        continue;
+      }
       final prereqs = entry.value.prerequisites;
 
       for (var prereq in prereqs) {

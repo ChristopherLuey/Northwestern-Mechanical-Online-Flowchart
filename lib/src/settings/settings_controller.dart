@@ -47,4 +47,11 @@ class SettingsController with ChangeNotifier {
     // SettingService.
     await _settingsService.updateThemeMode(newThemeMode);
   }
+
+  bool showPrereqWarnings = true;
+
+  void togglePrereqWarnings(bool value) {
+    showPrereqWarnings = value;
+    notifyListeners();
+  }
 }
